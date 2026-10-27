@@ -3,8 +3,6 @@ node_modules/
 .github_repo
 .env
 .env.*
-repository/
-attachments/
 
 __pycache__/
 *.pyc
