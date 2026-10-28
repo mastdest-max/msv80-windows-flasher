@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { Activity } from "lucide-react";
 import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { CHANNELS, FAST_CHANNEL_IDS, latestOf, logToCsv, sampleLog, type Channel, type LogSession, type Sample } from "@/lib/msv/logger";
@@ -53,6 +53,9 @@ export function LoggerPanel() {
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [menu, setMenu] = useState(false);
+  const [tablesOpen, setTablesOpen] = useState(false);
+  const [tables, setTables] = useState<{ key: number; group: string; x: number; y: number; z: number }[]>([]);
+  const tableKey = useRef(1);
   const [picked, setPicked] = useState<string[]>(["dme"]);
   const [watch, setWatch] = useState<string[]>([]);
   const stopRef = useRef(false);
@@ -231,6 +234,42 @@ export function LoggerPanel() {
     stopRef.current = true;
   }
 
+  function openTable(group: string) {
+    setTables((current) => {
+      const existing = current.find((item) => item.group === group);
+      const top = current.reduce((highest, item) => Math.max(highest, item.z), 1) + 1;
+      if (existing) return current.map((item) => (item.group === group ? { ...item, z: top } : item));
+      const key = tableKey.current++;
+      return [...current, { key, group, x: 16 + current.length * 28, y: 120 + current.length * 24, z: top }];
+    });
+    setTablesOpen(false);
+  }
+
+  function dragTable(key: number, event: ReactPointerEvent) {
+    event.preventDefault();
+    const table = tables.find((item) => item.key === key);
+    if (!table) return;
+    const originX = table.x;
+    const originY = table.y;
+    const startX = event.clientX;
+    const startY = event.clientY;
+    const top = tables.reduce((highest, item) => Math.max(highest, item.z), 1) + 1;
+    setTables((current) => current.map((item) => (item.key === key ? { ...item, z: top } : item)));
+    function move(next: PointerEvent) {
+      setTables((current) =>
+        current.map((item) =>
+          item.key === key ? { ...item, x: Math.max(0, originX + next.clientX - startX), y: Math.max(0, originY + next.clientY - startY) } : item,
+        ),
+      );
+    }
+    function up() {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+    }
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  }
+
   const points = log.samples.map((sample) => ({
     sec: Number((sample.t / 1000).toFixed(2)),
     value: sample.values[channel.id],
@@ -239,7 +278,7 @@ export function LoggerPanel() {
   const groups = [...new Set(CHANNELS.map((item) => item.group))];
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="relative flex flex-col gap-4">
       <div className="rounded-lg border border-line bg-surface p-4">
         <div className="flex items-center gap-2">
           <Activity className="size-4 text-lamp" aria-hidden="true" />
@@ -266,6 +305,28 @@ export function LoggerPanel() {
             </select>
             <span className="font-mono text-muted">{formatValue(channel, latestOf(log, channel.id))}</span>
           </label>
+          <div className="relative">
+            <button
+              type="button"
+              aria-expanded={tablesOpen}
+              className="h-11 rounded-md border border-line px-3 text-sm"
+              onClick={() => setTablesOpen((open) => !open)}
+            >
+              Tables{tables.length > 0 ? ` (${tables.length})` : ""}
+            </button>
+            {tablesOpen ? (
+              <div className="absolute z-30 mt-1 w-52 rounded-md border border-line bg-surface p-1 shadow-sm">
+                <button type="button" className="flex h-11 w-full items-center px-2 text-left text-sm" onClick={() => groups.forEach(openTable)}>
+                  Open all
+                </button>
+                {groups.map((group) => (
+                  <button key={group} type="button" className="flex h-11 w-full items-center px-2 text-left text-sm" onClick={() => openTable(group)}>
+                    {group}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </div>
           <div className="relative">
               <button
                 type="button"
@@ -366,6 +427,45 @@ export function LoggerPanel() {
             </ResponsiveContainer>
           </div>
         </div>
+      {tables.map((table) => {
+        const rows = CHANNELS.filter((item) => item.group === table.group);
+        return (
+          <section
+            key={table.key}
+            className="absolute w-72 rounded-lg border border-line bg-surface shadow-sm"
+            style={{ left: table.x, top: table.y, zIndex: table.z }}
+          >
+            <header
+              className="flex cursor-grab items-center justify-between border-b border-line px-3 py-2 active:cursor-grabbing"
+              onPointerDown={(event) => dragTable(table.key, event)}
+            >
+              <h3 className="text-sm font-medium">{table.group}</h3>
+              <button
+                type="button"
+                className="h-8 px-2 text-sm text-muted"
+                onPointerDown={(event) => event.stopPropagation()}
+                onClick={() => setTables((current) => current.filter((item) => item.key !== table.key))}
+              >
+                Close
+              </button>
+            </header>
+            <table className="w-full text-sm">
+              <tbody>
+                {rows.map((item) => (
+                  <tr
+                    key={item.id}
+                    className={item.id === channel.id ? "cursor-pointer bg-lamp-dim" : "cursor-pointer"}
+                    onClick={() => setChannelId(item.id)}
+                  >
+                    <td className="px-3 py-1.5">{item.name}</td>
+                    <td className="px-3 py-1.5 text-right font-mono text-muted">{formatValue(item, latestOf(log, item.id))}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </section>
+        );
+      })}
       <ChassisPanel />
     </div>
   );
