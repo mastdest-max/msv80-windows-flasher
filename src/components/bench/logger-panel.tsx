@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Activity, CircleCheck } from "lucide-react";
 import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { CHANNELS, FAST_CHANNEL_IDS, latestOf, logToCsv, sampleLog, type Channel, type LogSession, type Sample } from "@/lib/msv/logger";
-import { describeLocal } from "@/lib/msv/chassis";
+import { describeBlock, localPayload, words } from "@/lib/msv/chassis";
 import { ChassisPanel } from "@/components/bench/chassis-panel";
 import { useSession } from "@/lib/msv/session";
 
@@ -10,11 +10,11 @@ const MAX_SAMPLES = 1200;
 
 const WATCH = [
   { id: "dme", name: "DME", detail: "Engine speed and throttle" },
-  { id: "dsc", name: "DSC", detail: "Wheel speeds", target: 0x29, local: 0x01 },
-  { id: "yaw", name: "Yaw", detail: "Yaw rate", target: 0x29, local: 0x02 },
-  { id: "szl", name: "SZL", detail: "Steering angle", target: 0x34, local: 0x01 },
-  { id: "vtg", name: "VTG", detail: "Transfer case", target: 0x19, local: 0x01 },
-  { id: "ekps", name: "EKPS", detail: "Fuel pump", target: 0x17, local: 0x01 },
+  { id: "dsc", name: "DSC", detail: "Four wheel speeds", target: 0x29, local: 0x01, kind: "wheels" },
+  { id: "yaw", name: "Yaw", detail: "Yaw rate", target: 0x29, local: 0x02, kind: "single" },
+  { id: "szl", name: "SZL", detail: "Steering angle", target: 0x34, local: 0x01, kind: "single" },
+  { id: "vtg", name: "VTG", detail: "Transfer case temp and angle", target: 0x19, local: 0x01, kind: "case" },
+  { id: "ekps", name: "EKPS", detail: "Fuel pump", target: 0x17, local: 0x01, kind: "single" },
 ] as const;
 
 function formatValue(channel: Channel, value: number | null) {
@@ -27,7 +27,10 @@ function plausible(id: string, value: number, previous: number | null, dt: numbe
   if (id === "lambda" && value >= 1.99) return false;
   if (id === "commandedLambda" && (value < 0.7 || value > 1.35)) return false;
   if (id === "voltage" && (value < 8 || value > 16.5)) return false;
-  if (id === "cat" && (value < -40 || value > 1100)) return false;
+  if ((id === "o2" || id === "o2b") && (value < 0 || value > 1.3)) return false;
+  if ((id === "level" || id === "purge" || id === "egr" || id === "throttleB" || id === "throttleC" || id === "pedalRel") && (value < 0 || value > 100)) return false;
+  if (id === "fuelRate" && (value < 0 || value > 80)) return false;
+  if ((id === "cat" || id === "cat2") && (value < -40 || value > 1100)) return false;
   if (id === "speed" && previous != null && Math.abs(value - previous) > 15 + Math.max(dt, 0) * 40) return false;
   return true;
 }
@@ -83,15 +86,15 @@ export function LoggerPanel() {
     const samples: Sample[] = [];
     const origin = Date.now();
     const liveNote =
-      "The checked modules are read together. DME is the fast throttle chart. DSC, yaw, SZL, VTG, and EKPS are status blocks. Counts stay unscaled until a reply confirms the unit.";
+      "The checked modules are read together. DME is the engine list. DSC fills the four wheel counts. VTG fills the transfer-case counts. Those counts stay unscaled until a reply confirms km/h or degrees.";
     setLog({ source: "live", note: liveNote, samples });
     let misses = 0;
     let carried: Record<string, number | null> = {};
     let painted = 0;
     let tick = 0;
     let packed = false;
-    const fast = CHANNELS.filter((item) => FAST_CHANNEL_IDS.includes(item.id));
-    const rest = CHANNELS.filter((item) => !FAST_CHANNEL_IDS.includes(item.id));
+    const fast = CHANNELS.filter((item) => item.pid >= 0 && FAST_CHANNEL_IDS.includes(item.id));
+    const rest = CHANNELS.filter((item) => item.pid >= 0 && !FAST_CHANNEL_IDS.includes(item.id));
     let lines: string[] = [];
     const quiet = new Map<string, number>();
     let speedAt = 0;
@@ -170,9 +173,24 @@ export function LoggerPanel() {
           for (const item of WATCH) {
             if (!("target" in item) || !selected.includes(item.id) || stopRef.current) continue;
             const raw = await current.link.requestModule(item.target, Uint8Array.of(0x21, item.local), 120, true);
-            const text = describeLocal(raw, item.local);
+            const payload = localPayload(raw, item.local);
+            const text = payload === "refused" ? `Refused block ${item.local.toString(16).toUpperCase()}.` : payload ? describeBlock(payload, item.kind) : "No reply.";
             nextLines.push(`${item.name}: ${text}`);
-            if (text !== "No reply.") hit = true;
+            if (payload && payload !== "refused") {
+              hit = true;
+              if (item.kind === "wheels" && payload.length >= 8) {
+                const [fl, fr, rl, rr] = words(payload);
+                values.wheelFl = fl;
+                values.wheelFr = fr;
+                values.wheelRl = rl;
+                values.wheelRr = rr;
+              }
+              if (item.kind === "case" && payload.length >= 4) {
+                const [temp, angle] = words(payload);
+                values.caseTemp = temp;
+                values.caseAngle = angle;
+              }
+            }
           }
           if (nextLines.length > 0) lines = nextLines;
         }

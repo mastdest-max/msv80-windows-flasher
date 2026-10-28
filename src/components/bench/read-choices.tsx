@@ -104,6 +104,7 @@ export function ReadChoices({
   async function readScalars() {
     const live: ScalarRow[] = [];
     for (const channel of CHANNELS) {
+      if (channel.pid < 0) continue;
       if (stopRef.current) break;
       const current = useSession.getState();
       if (!current.link) break;
