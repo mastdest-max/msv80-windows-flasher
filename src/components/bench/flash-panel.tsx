@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { formatAddress, formatBytes } from "@/lib/msv/format";
 import { flashSpans, type FlashProgress } from "@/lib/msv/flash-job";
 import { parseIntelHex, type IntelImage } from "@/lib/msv/intel-hex";
+import { CAL_BASE, CAL_SIZE, FULL_SIZE } from "@/lib/msv/read-job";
 import { rsaDeleteUrl, RSA_PROGRAM } from "@/lib/msv/security-access";
 import { useSession } from "@/lib/msv/session";
 import { parseWinkfpControl, type WinkfpControl } from "@/lib/msv/winkfp-job";
@@ -45,9 +46,27 @@ export function FlashPanel({ onLock }: { onLock?: (locked: boolean) => void }) {
     setError(null);
     setDone(null);
     for (const file of list) {
-      const text = await file.text();
       const lower = file.name.toLowerCase();
       try {
+        if (lower.endsWith(".bin")) {
+          const data = new Uint8Array(await file.arrayBuffer());
+          const calibrationFile = data.length === CAL_SIZE;
+          const full = data.length === FULL_SIZE;
+          if (!calibrationFile && !full) {
+            setError(`${file.name} is ${data.length.toLocaleString()} bytes. Only a full module or a calibration is written back. A shorter file stays a partial read.`);
+            continue;
+          }
+          const image: IntelImage = {
+            reference: file.name.replace(/\.[^.]+$/, ""),
+            spans: [{ address: calibrationFile ? CAL_BASE : 0, bytes: data }],
+            bytes: data.length,
+            skipped: 0,
+          };
+          if (calibrationFile) setCalibration({ name: file.name, image });
+          else setProgram({ name: file.name, image });
+          continue;
+        }
+        const text = await file.text();
         if (lower.endsWith(".ctl") || lower.endsWith(".bat")) {
           if (lower.endsWith(".ctl") || text.includes("MF_PROGRAMM_DATEI") || text.includes("MF_SG_ADR")) {
             setControl(parseWinkfpControl(text));
@@ -135,13 +154,13 @@ export function FlashPanel({ onLock }: { onLock?: (locked: boolean) => void }) {
       </div>
 
       <label className="flex min-h-28 cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-line bg-surface px-4 py-6 text-center">
-        <span className="font-medium">Drop the .ctl, .0PA, and .0DA</span>
-        <span className="text-sm text-muted">The control file names the program. The hex file is what gets written.</span>
+        <span className="font-medium">Drop the .ctl, .0PA, .0DA, or a full .BIN</span>
+        <span className="text-sm text-muted">A full module or a calibration can be written back. A shorter file is kept as a partial read.</span>
         <input
           className="sr-only"
           type="file"
           multiple
-          accept=".ctl,.0pa,.0da,.hex,.bat"
+          accept=".ctl,.0pa,.0da,.hex,.bat,.bin"
           disabled={busy}
           onChange={(event) => {
             const list = event.target.files;

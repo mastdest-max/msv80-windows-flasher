@@ -196,8 +196,11 @@ export function ReadChoices({
           if (!current.link) return;
           setNote("Asking the DME to open security before the BIN read.");
           const security = await openBinSecurity(current.link, current.can500);
-          setNote(security.detail);
-          if (!security.unlocked) return;
+          setNote(
+            security.unlocked
+              ? security.detail
+              : `${security.detail} The read will still try. If the DME stops, the bytes already received are saved as a partial file.`,
+          );
         }
         if (job === "0da") await readImage(CAL_BASE, CAL_SIZE, "DME_calibration.0da");
         else await readImage(0, FULL_SIZE, "DME_full.bin");
