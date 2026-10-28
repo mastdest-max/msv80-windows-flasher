@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { formatAddress, formatBytes } from "@/lib/msv/format";
 import { flashSpans, type FlashProgress } from "@/lib/msv/flash-job";
 import { parseIntelHex, type IntelImage } from "@/lib/msv/intel-hex";
+import { rsaDeleteUrl, RSA_PROGRAM } from "@/lib/msv/security-access";
 import { useSession } from "@/lib/msv/session";
 import { parseWinkfpControl, type WinkfpControl } from "@/lib/msv/winkfp-job";
 
@@ -81,13 +82,32 @@ export function FlashPanel({ onLock }: { onLock?: (locked: boolean) => void }) {
     }
   }
 
+  async function loadBypass() {
+    setError(null);
+    setDone(null);
+    try {
+      const response = await fetch(rsaDeleteUrl());
+      if (!response.ok) throw new Error("The security bypass file is not in this copy of the app.");
+      const image = parseIntelHex(await response.text());
+      setProgram({ name: RSA_PROGRAM + ".0pa", image });
+      setKind("0pa");
+      setFamily("MSV80");
+      setControl({ program: RSA_PROGRAM + ".0pa", calibration: null, address: 0x12, prg: "12MSV80.prg", ipo: "12msv80.ipo" });
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "The security bypass did not load.");
+    }
+  }
+
   return (
     <div className="flex flex-col gap-4">
       <div className="rounded-lg border border-danger/40 bg-surface p-4">
         <h2 className="font-medium">Write the DME</h2>
         <p className="mt-2 text-sm text-muted">
-          This sends a WinKFP program or calibration to the engine module on the lead that is already open. Ignition on, engine off, charger connected. Do not close the window until it finishes.
+          This sends a WinKFP program or calibration to the engine module on the lead that is already open. A full BIN read asks for security first. If the DME is locked, load the security bypass here, then write a tune or a stock file. The car will not start if the bypass is the only file written. Ignition on, engine off, charger connected.
         </p>
+        <button type="button" className="mt-3 h-11 rounded-md border border-line px-3 text-sm" disabled={busy} onClick={() => void loadBypass()}>
+          Load the MSV80 security bypass
+        </button>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-3">

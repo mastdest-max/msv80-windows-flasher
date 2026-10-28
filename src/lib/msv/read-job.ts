@@ -32,7 +32,7 @@ const NRC: Record<number, string> = {
   0x12: "The DME rejected the identifier.",
   0x22: "Conditions not correct. Ignition on, and do not start a programming session.",
   0x31: "That address is out of range for this DME.",
-  0x33: "The DME refused the read. Security access is required, and this app will not guess a key.",
+  0x33: "The DME refused because security is closed. The BIN read asks for access first and does not guess a key.",
   0x78: "The DME is still busy.",
 };
 

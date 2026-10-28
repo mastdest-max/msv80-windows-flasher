@@ -11,7 +11,7 @@ const STEPS = [
   },
   {
     title: "Read with a tool that speaks MSV80",
-    body: "On the Cable tab, pick one job. Logger is live data only. Programs reads the 0049 id. Scalars reads single values, and uses a loaded XDF for calibration cells. Calibration .0DA and full .BIN try a memory read and stop if the DME asks for a security key.",
+    body: "On the Cable tab, pick one job. Logger is live data only. Programs reads the 0049 id. Scalars reads single values, and uses a loaded XDF for calibration cells. A full BIN asks the DME to open security before the read. If the DME is still locked, the security bypass is a separate write and must be followed by a tune or a stock file.",
   },
   {
     title: "Hold the voltage",

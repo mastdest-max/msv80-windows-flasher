@@ -19,6 +19,9 @@ import {
   type ReadJob,
   type ScalarRow,
 } from "@/lib/msv/read-job";
+import { flashSpans } from "@/lib/msv/flash-job";
+import { parseIntelHex } from "@/lib/msv/intel-hex";
+import { openBinSecurity, rsaDeleteUrl, RSA_PROGRAM } from "@/lib/msv/security-access";
 import { useSession } from "@/lib/msv/session";
 import type { XdfScalar } from "@/lib/msv/xdf";
 import { toIntelHex } from "@/lib/msv/parse";
@@ -48,6 +51,8 @@ export function ReadChoices({
   const connected = useSession((state) => state.link !== null);
   const [job, setJob] = useState<ReadJob>("programs");
   const [busy, setBusy] = useState(false);
+  const [bypassArmed, setBypassArmed] = useState(false);
+  const [bypassId, setBypassId] = useState("");
   const [note, setNote] = useState<string | null>(null);
   const [rows, setRows] = useState<ScalarRow[] | null>(null);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
@@ -184,8 +189,18 @@ export function ReadChoices({
     try {
       if (job === "programs") await readPrograms();
       else if (job === "scalars") await readScalars();
-      else if (job === "0da") await readImage(CAL_BASE, CAL_SIZE, "DME_calibration.0da");
-      else await readImage(0, FULL_SIZE, "DME_full.bin");
+      else {
+        if (job === "bin") {
+          const current = useSession.getState();
+          if (!current.link) return;
+          setNote("Asking the DME to open security before the BIN read.");
+          const security = await openBinSecurity(current.link, current.can500);
+          setNote(security.detail);
+          if (!security.unlocked) return;
+        }
+        if (job === "0da") await readImage(CAL_BASE, CAL_SIZE, "DME_calibration.0da");
+        else await readImage(0, FULL_SIZE, "DME_full.bin");
+      }
     } catch (err) {
       setNote(err instanceof Error ? err.message : "The read stopped.");
     } finally {
@@ -201,6 +216,32 @@ export function ReadChoices({
     setFile(null);
     setProgress(null);
     setNote("Sample program list, so you can see this view before the lead is on the DME.");
+  }
+
+  async function startBypass() {
+    const current = useSession.getState();
+    if (!current.link) return;
+    stopRef.current = false;
+    setBusy(true);
+    setNote("Loading the security bypass.");
+    onLock(true);
+    try {
+      const response = await fetch(rsaDeleteUrl());
+      if (!response.ok) throw new Error("The security bypass file is not in this copy of the app.");
+      const image = parseIntelHex(await response.text());
+      if (image.reference !== RSA_PROGRAM) throw new Error("The bypass file is not the MSV80 program this car uses.");
+      setNote("Writing the security bypass. Leave the ignition on. Do not close this window.");
+      await flashSpans(current.link, current.can500, image.spans, (progress) => {
+        setProgress({ done: progress.sent, total: progress.total });
+        setNote(progress.phase);
+      });
+      setNote("Security bypass written. Turn the ignition off, then on. Write a tune or a stock file next or the car will not start.");
+    } catch (err) {
+      setNote(err instanceof Error ? err.message : "The security bypass stopped.");
+    } finally {
+      setBusy(false);
+      onLock(false);
+    }
   }
 
   const percent = progress && progress.total ? Math.round((progress.done / progress.total) * 100) : 0;
@@ -242,6 +283,36 @@ export function ReadChoices({
           );
         })}
       </div>
+      {job === "bin" ? (
+        <div className="mt-3 rounded-lg border border-danger/40 px-3 py-3 text-sm">
+          <p className="font-medium">Security bypass</p>
+          <p className="mt-1 text-muted">
+            A full BIN asks the DME to open security first. If it is still locked, this writes the MSV80 bypass into the boot area. Do not leave the car on that file. Write a tune or a stock file next, or it will not start. Keep a charger on it.
+          </p>
+          <label className="mt-2 flex items-start gap-2">
+            <input className="mt-1" type="checkbox" checked={bypassArmed} disabled={busy} onChange={(event) => setBypassArmed(event.target.checked)} />
+            <span>A tune or a stock file is ready to write after this.</span>
+          </label>
+          <label className="mt-2 flex flex-col gap-1">
+            Type {RSA_PROGRAM} to arm the bypass
+            <input
+              className="h-11 rounded-md border border-line bg-bg px-3 font-mono"
+              value={bypassId}
+              disabled={busy}
+              onChange={(event) => setBypassId(event.target.value)}
+              autoComplete="off"
+            />
+          </label>
+          <button
+            type="button"
+            className="mt-2 h-11 rounded-md bg-danger px-3 text-sm font-medium text-bg disabled:opacity-50"
+            disabled={!connected || busy || !bypassArmed || bypassId.trim().toUpperCase() !== RSA_PROGRAM}
+            onClick={() => void startBypass()}
+          >
+            Start the security bypass
+          </button>
+        </div>
+      ) : null}
       <div className="mt-3 flex flex-wrap gap-2">
         <button
           type="button"
@@ -263,7 +334,7 @@ export function ReadChoices({
       </div>
       {busy ? (
         <p className="mt-3 text-sm">
-          The other sections are locked until this finishes. Closing the tab cuts the read off. Nothing is being written to the DME.
+          The other sections are locked until this finishes. Closing the tab cuts the lead off.
         </p>
       ) : null}
       {!connected ? <p className="mt-3 text-sm text-muted">Connect the lead first. The choice stays put until you do.</p> : null}
