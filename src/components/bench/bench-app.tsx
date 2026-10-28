@@ -1,6 +1,7 @@
 import { useEffect, useId, useState, type DragEvent } from "react";
 import { CircleCheck, Cpu, Search, TriangleAlert, Upload } from "lucide-react";
 import { TestsPanel } from "@/components/bench/tests-panel";
+import { FlashPanel } from "@/components/bench/flash-panel";
 import { BusPanel } from "@/components/bench/bus-panel";
 import { CodingPanel } from "@/components/bench/coding-panel";
 import { RepositoryPanel } from "@/components/bench/repository-panel";
@@ -23,7 +24,7 @@ import { compareXdf } from "@/lib/msv/xdf";
 import { explainIdent } from "@/lib/msv/identify";
 import type { Report } from "@/lib/msv/analyze";
 
-type Tab = "inspect" | "cable" | "log" | "read" | "bus" | "coding" | "tests" | "repo";
+type Tab = "inspect" | "cable" | "log" | "read" | "bus" | "coding" | "tests" | "repo" | "flash";
 type Focus = { address: number; length: number };
 
 const KIND: Record<Report["readClass"], string> = {
@@ -114,34 +115,47 @@ export function BenchApp() {
             </span>
             <div>
               <h1 className="text-xl font-semibold tracking-tight">MSV Bench</h1>
-              <p className="text-sm text-muted">Logger, chassis, bus scan, coding trace, repository, or a module read.</p>
+              <p className="text-sm text-muted">Cable, live data, chassis, or a WinKFP write to the DME.</p>
             </div>
           </div>
-          <div role="tablist" aria-label="Bench sections" className="flex gap-1 overflow-x-auto border-b border-line">
+          <div role="tablist" aria-label="Bench sections" className="flex flex-wrap items-end gap-2">
+            <GroupSelect
+              label="Flash"
+              tabs={[
+                { id: "flash", label: "Write the DME" },
+                { id: "read", label: "How to read" },
+              ]}
+              current={tab}
+              locked={locked}
+              onSelect={setTab}
+            />
             <TabButton id="cable" current={tab} locked={locked} onSelect={setTab}>
               Cable
             </TabButton>
             <TabButton id="log" current={tab} locked={locked} onSelect={setTab}>
               Logger
             </TabButton>
-            <TabButton id="bus" current={tab} locked={locked} onSelect={setTab}>
-              Bus
-            </TabButton>
-            <TabButton id="tests" current={tab} locked={locked} onSelect={setTab}>
-              Tests
-            </TabButton>
-            <TabButton id="coding" current={tab} locked={locked} onSelect={setTab}>
-              Coding
-            </TabButton>
-            <TabButton id="repo" current={tab} locked={locked} onSelect={setTab}>
-              Repository
-            </TabButton>
-            <TabButton id="inspect" current={tab} locked={locked} onSelect={setTab}>
-              Inspect
-            </TabButton>
-            <TabButton id="read" current={tab} locked={locked} onSelect={setTab}>
-              How to read
-            </TabButton>
+            <GroupSelect
+              label="Car"
+              tabs={[
+                { id: "bus", label: "Bus" },
+                { id: "tests", label: "Tests" },
+                { id: "coding", label: "Coding" },
+              ]}
+              current={tab}
+              locked={locked}
+              onSelect={setTab}
+            />
+            <GroupSelect
+              label="Files"
+              tabs={[
+                { id: "inspect", label: "Inspect" },
+                { id: "repo", label: "Repository" },
+              ]}
+              current={tab}
+              locked={locked}
+              onSelect={setTab}
+            />
           </div>
         </header>
 
@@ -151,7 +165,9 @@ export function BenchApp() {
           </p>
         ) : null}
 
-        {tab === "read" ? (
+        {tab === "flash" ? (
+          <FlashPanel onLock={setLocked} />
+        ) : tab === "read" ? (
           <Procedure />
         ) : tab === "bus" ? (
           <BusPanel />
@@ -312,6 +328,43 @@ export function BenchApp() {
         )}
       </div>
     </main>
+  );
+}
+
+function GroupSelect({
+  label,
+  tabs,
+  current,
+  locked,
+  onSelect,
+}: {
+  label: string;
+  tabs: { id: Tab; label: string }[];
+  current: Tab;
+  locked: boolean;
+  onSelect: (tab: Tab) => void;
+}) {
+  const active = tabs.some((item) => item.id === current);
+  return (
+    <label className="flex flex-col text-xs text-muted">
+      {label}
+      <select
+        className="h-11 min-w-36 rounded-md border border-line bg-surface px-2 text-sm text-fg disabled:opacity-40"
+        value={active ? current : ""}
+        disabled={locked}
+        aria-label={label}
+        onChange={(event) => {
+          if (!locked && event.target.value) onSelect(event.target.value as Tab);
+        }}
+      >
+        {active ? null : <option value="">Choose</option>}
+        {tabs.map((item) => (
+          <option key={item.id} value={item.id}>
+            {item.label}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }
 

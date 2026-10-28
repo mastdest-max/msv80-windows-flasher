@@ -209,7 +209,7 @@ export function ReadChoices({
     <div className="rounded-lg border border-line bg-surface p-4">
       <h2 className="font-medium">What to read</h2>
       <p className="mt-2 text-sm text-muted">
-        A full module is about 2.5 MB. A calibration is about 250 KB of maps. Anything shorter is a partial read. This app does not write the DME.
+        A full module is about 2.5 MB. A calibration is about 250 KB of maps. Anything shorter is a partial read. Writing a file is on the Flash menu, not here.
       </p>
       <div className="mt-3 grid gap-2 sm:grid-cols-2">
         <button

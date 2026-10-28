@@ -11,7 +11,7 @@ const STEPS = [
   },
   {
     title: "Read with a tool that speaks MSV80",
-    body: "On the Cable tab, pick one job. Logger is live data only. Programs reads the 0049 id. Scalars reads single values, and uses a loaded XDF for calibration cells. Calibration .0DA and full .BIN try a memory read and stop if the DME asks for a security key. This app does not guess that key and does not flash.",
+    body: "On the Cable tab, pick one job. Logger is live data only. Programs reads the 0049 id. Scalars reads single values, and uses a loaded XDF for calibration cells. Calibration .0DA and full .BIN try a memory read and stop if the DME asks for a security key.",
   },
   {
     title: "Hold the voltage",
@@ -23,7 +23,7 @@ const STEPS = [
   },
   {
     title: "Flashing is a separate step",
-    body: "There is no MSV80.1.prg. WinKFP uses the MSV80 pair from SP-Daten — often 08MSV80.prg or 14MSV80.prg, and 12MSV80.ipo or 14MSV80.ipo, depending on the daten set. Expert mode will write whatever .0PA and .0DA you point at. The wrong pair, with the signature still closed, can kill the DME. This bench does not flash and does not patch signatures.",
+    body: "The Flash menu writes a WinKFP .0PA or .0DA through the lead. Load the .ctl with the program file. The DME address in that control file is the module that gets written. A wrong file, or a write that stops halfway, can leave the car unable to start. The app will not invent a security key.",
   },
 ];
 
