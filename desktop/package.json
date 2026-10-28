@@ -1,0 +1,32 @@
+{
+  "name": "msv-bench",
+  "productName": "MSV Bench",
+  "version": "1.0.0",
+  "private": true,
+  "main": "electron-main.mjs",
+  "type": "module",
+  "scripts": {
+    "start": "electron .",
+    "dist:win": "electron-builder --win zip --x64"
+  },
+  "build": {
+    "appId": "com.mastdest.msvbench",
+    "productName": "MSV Bench",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "electron-main.mjs",
+      "repository-store.mjs",
+      "dist/**/*"
+    ],
+    "win": {
+      "target": ["zip"],
+      "signAndEditExecutable": false
+    }
+  },
+  "devDependencies": {
+    "electron": "^35.7.5",
+    "electron-builder": "^25.1.8"
+  }
+}
