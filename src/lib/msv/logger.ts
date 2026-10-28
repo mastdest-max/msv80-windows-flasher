@@ -6,7 +6,9 @@ export type Channel = {
   name: string;
   unit: string;
   digits: number;
-  group: "Engine" | "Air" | "Fuel" | "Temperature" | "Chassis";
+  group: "Engine" | "Air" | "Fuel" | "Temperature" | "Chassis" | "N52";
+  /** BMW measurement id from the Test0 MSV80 log. Absent for ordinary OBD channels. */
+  local?: number;
   decode: (a: number, b: number) => number;
 };
 
@@ -58,8 +60,27 @@ export const CHANNELS: Channel[] = [
   { id: "wheelFr", pid: -1, group: "Chassis", name: "Front right wheel", unit: "count", digits: 0, decode: (a) => a },
   { id: "wheelRl", pid: -1, group: "Chassis", name: "Rear left wheel", unit: "count", digits: 0, decode: (a) => a },
   { id: "wheelRr", pid: -1, group: "Chassis", name: "Rear right wheel", unit: "count", digits: 0, decode: (a) => a },
-  { id: "caseTemp", pid: -1, group: "Chassis", name: "Transfer case temp", unit: "count", digits: 0, decode: (a) => a },
-  { id: "caseAngle", pid: -1, group: "Chassis", name: "Transfer case angle", unit: "count", digits: 0, decode: (a) => a },
+  { id: "caseTemp", pid: -1, group: "Chassis", name: "Clutch temperature", unit: "count", digits: 0, decode: (a) => a },
+  { id: "caseAngle", pid: -1, group: "Chassis", name: "Clutch angle", unit: "count", digits: 0, decode: (a) => a },
+  { id: "clutchTorque", pid: -1, group: "Chassis", name: "Clutch torque", unit: "count", digits: 0, decode: (a) => a },
+  { id: "valvetronic", pid: -1, local: 0x5a49, group: "N52", name: "Valvetronic", unit: "raw", digits: 0, decode: (a) => a },
+  { id: "vanosIn", pid: -1, local: 0x4506, group: "N52", name: "Intake VANOS", unit: "raw", digits: 0, decode: (a) => a },
+  { id: "vanosOut", pid: -1, local: 0x4507, group: "N52", name: "Exhaust VANOS", unit: "raw", digits: 0, decode: (a) => a },
+  { id: "vanosInAdapt", pid: -1, local: 0x5896, group: "N52", name: "Intake VANOS adapt", unit: "raw", digits: 0, decode: (a) => a },
+  { id: "vanosOutAdapt", pid: -1, local: 0x5897, group: "N52", name: "Exhaust VANOS adapt", unit: "raw", digits: 0, decode: (a) => a },
+  { id: "lambda1", pid: -1, local: 0x5a50, group: "N52", name: "Lambda bank 1", unit: "raw", digits: 0, decode: (a) => a },
+  { id: "lambda2", pid: -1, local: 0x5a51, group: "N52", name: "Lambda bank 2", unit: "raw", digits: 0, decode: (a) => a },
+  { id: "integrator1", pid: -1, local: 0x5a11, group: "N52", name: "Integrator bank 1", unit: "raw", digits: 0, decode: (a) => a },
+  { id: "integrator2", pid: -1, local: 0x5a12, group: "N52", name: "Integrator bank 2", unit: "raw", digits: 0, decode: (a) => a },
+  { id: "lambdaCtrl", pid: -1, local: 0x4705, group: "N52", name: "Lambda control", unit: "raw", digits: 0, decode: (a) => a },
+  { id: "ignition", pid: -1, local: 0x4610, group: "N52", name: "Ignition angle", unit: "raw", digits: 0, decode: (a) => a },
+  { id: "knock", pid: -1, local: 0x5a3d, group: "N52", name: "Knock", unit: "raw", digits: 0, decode: (a) => a },
+  { id: "inj1", pid: -1, local: 0x5b00, group: "N52", name: "Injection 1", unit: "raw", digits: 0, decode: (a) => a },
+  { id: "inj2", pid: -1, local: 0x5b01, group: "N52", name: "Injection 2", unit: "raw", digits: 0, decode: (a) => a },
+  { id: "inj3", pid: -1, local: 0x5b02, group: "N52", name: "Injection 3", unit: "raw", digits: 0, decode: (a) => a },
+  { id: "inj4", pid: -1, local: 0x5b03, group: "N52", name: "Injection 4", unit: "raw", digits: 0, decode: (a) => a },
+  { id: "inj5", pid: -1, local: 0x5b04, group: "N52", name: "Injection 5", unit: "raw", digits: 0, decode: (a) => a },
+  { id: "inj6", pid: -1, local: 0x5b05, group: "N52", name: "Injection 6", unit: "raw", digits: 0, decode: (a) => a },
 ];
 
 const PID_DATA_BYTES: Record<number, number> = {
@@ -230,6 +251,25 @@ export function sampleLog(): LogSession {
         wheelRr: i < 8 ? 0 : 401 + i * 12,
         caseTemp: 40 + i * 0.2,
         caseAngle: 120 + blip * 30,
+        clutchTorque: 8 + blip * 40,
+        valvetronic: 180 + blip * 400,
+        vanosIn: 850,
+        vanosOut: -1100,
+        vanosInAdapt: 4,
+        vanosOutAdapt: -6,
+        lambda1: 1000,
+        lambda2: 998,
+        integrator1: 12,
+        integrator2: 8,
+        lambdaCtrl: 0,
+        ignition: 80 + blip * 40,
+        knock: 0,
+        inj1: 220,
+        inj2: 218,
+        inj3: 221,
+        inj4: 219,
+        inj5: 220,
+        inj6: 217,
       },
     });
   }

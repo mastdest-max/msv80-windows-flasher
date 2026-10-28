@@ -86,7 +86,7 @@ export function LoggerPanel() {
     const samples: Sample[] = [];
     const origin = Date.now();
     const liveNote =
-      "The checked modules are read together. DME is the engine list. DSC fills the four wheel counts. VTG fills the transfer-case counts. Those counts stay unscaled until a reply confirms km/h or degrees.";
+      "The checked modules are read together. N52 values are the Test0 measurement blocks: Valvetronic, both VANOS cams, both lambda banks, and injection. DSC fills the four wheel counts. VTG fills clutch temperature, angle, and torque. Those chassis counts stay unscaled.";
     setLog({ source: "live", note: liveNote, samples });
     let misses = 0;
     let carried: Record<string, number | null> = {};
@@ -95,6 +95,7 @@ export function LoggerPanel() {
     let packed = false;
     const fast = CHANNELS.filter((item) => item.pid >= 0 && FAST_CHANNEL_IDS.includes(item.id));
     const rest = CHANNELS.filter((item) => item.pid >= 0 && !FAST_CHANNEL_IDS.includes(item.id));
+    const locals = CHANNELS.filter((item) => item.local != null);
     let lines: string[] = [];
     const quiet = new Map<string, number>();
     let speedAt = 0;
@@ -129,11 +130,12 @@ export function LoggerPanel() {
               hit = true;
             }
             if (tick % 8 === 0) {
-              const pending = rest.filter((item) => (quiet.get(item.id) ?? 0) < 4);
+              const pending = [...rest, ...locals].filter((item) => (quiet.get(item.id) ?? 0) < 4);
               const extra = pending.length > 0 ? pending[Math.floor(tick / 8) % pending.length] : undefined;
               if (extra) {
-                const more = await current.link.readObd(extra.pid, current.can500, true);
-                const value = more ? extra.decode(more.a, more.b) : null;
+                const value = extra.local != null
+                  ? await current.link.readMesswert(extra.local)
+                  : await current.link.readObd(extra.pid, current.can500, true).then((more) => (more ? extra.decode(more.a, more.b) : null));
                 const age = samples.length ? (Date.now() - origin - samples[samples.length - 1].t) / 1000 : 1;
                 if (value != null && plausible(extra.id, value, carried[extra.id] ?? null, extra.id === "speed" ? (Date.now() - origin - speedAt) / 1000 : age)) {
                   values[extra.id] = value;
@@ -154,11 +156,12 @@ export function LoggerPanel() {
               }
             }
             if (tick % 4 === 0) {
-              const pending = others.filter((item) => (quiet.get(item.id) ?? 0) < 4);
+              const pending = [...others, ...locals].filter((item) => (quiet.get(item.id) ?? 0) < 4);
               const extra = pending.length > 0 ? pending[Math.floor(tick / 4) % pending.length] : undefined;
               if (extra) {
-                const more = await current.link.readObd(extra.pid, current.can500, true);
-                const value = more ? extra.decode(more.a, more.b) : null;
+                const value = extra.local != null
+                  ? await current.link.readMesswert(extra.local)
+                  : await current.link.readObd(extra.pid, current.can500, true).then((more) => (more ? extra.decode(more.a, more.b) : null));
                 if (value != null && plausible(extra.id, value, carried[extra.id] ?? null, extra.id === "speed" ? (Date.now() - origin - speedAt) / 1000 : 1)) {
                   values[extra.id] = value;
                   if (extra.id === "speed") speedAt = Date.now() - origin;
@@ -186,9 +189,10 @@ export function LoggerPanel() {
                 values.wheelRr = rr;
               }
               if (item.kind === "case" && payload.length >= 4) {
-                const [temp, angle] = words(payload);
-                values.caseTemp = temp;
-                values.caseAngle = angle;
+                const wordsIn = words(payload);
+                values.caseTemp = wordsIn[0];
+                values.caseAngle = wordsIn[1];
+                if (wordsIn.length >= 3) values.clutchTorque = wordsIn[2];
               }
             }
           }

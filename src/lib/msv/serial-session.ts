@@ -430,6 +430,25 @@ export class CableLink {
     return found;
   }
 
+  /** Test0 MSV80 measurement block. Returns the signed word, or null when the DME refuses that id. */
+  async readMesswert(id: number): Promise<number | null> {
+    const hi = (id >> 8) & 0xff;
+    const lo = id & 0xff;
+    const payload = Uint8Array.of(0x21, hi, lo);
+    const frame = kwpFrame(0x12, payload);
+    const raw = await this.transact(frame, 160, true, true, true);
+    const extra = beyondEcho(frame, raw);
+    for (const body of kwpBodies(extra)) {
+      if (body.kind !== "ok" || body.service !== 0x61 || body.data.length < 2) continue;
+      let at = 0;
+      if (body.data.length >= 4 && body.data[0] === hi && body.data[1] === lo) at = 2;
+      if (body.data.length < at + 2) return null;
+      const word = (body.data[at] << 8) | body.data[at + 1];
+      return word > 0x7fff ? word - 0x10000 : word;
+    }
+    return null;
+  }
+
   async moduleVoltage(): Promise<number | null> {
     const pair = await this.readObd(0x42, true);
     if (!pair) return null;
