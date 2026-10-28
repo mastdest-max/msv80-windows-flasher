@@ -5,7 +5,7 @@ import { hexBytes, ignitionRequest } from "@/lib/msv/kdcan";
 import { CableLink, baudOrder, portName, serialAccess, serialApi, type LineState, type ProbeKind, type SerialApi, type SerialPortLike } from "@/lib/msv/serial-session";
 import { useSession } from "@/lib/msv/session";
 import { E89Panel } from "@/components/bench/e89-panel";
-import { xhpWifiPort } from "@/lib/msv/wifi-port";
+import { desktopXhp, xhpWifiPort } from "@/lib/msv/wifi-port";
 
 type LogLine = { id: number; text: string };
 
@@ -423,13 +423,21 @@ export function CablePanel({ onCapture }: { onCapture: (name: string, bytes: Uin
           </div>
           <div className="mt-4 border-t border-line pt-4">
             <h3 className="text-sm font-medium">xHP Wi-Fi</h3>
-            <p className="mt-2 text-sm text-muted">
-              Chrome cannot open the adapter port itself. Download the bridge again, stop the old window with Ctrl+C, and run py xhp-bridge.py. Windows will leave this Wi-Fi because it has no internet. Turn off Connect automatically on your home Wi-Fi, then join the adapter and leave the scanner plugged in.
-            </p>
+            {desktopXhp() ? (
+              <p className="mt-2 text-sm text-muted">
+                Join the adapter Wi-Fi, then press Connect. This app opens the adapter port itself and tries again if Windows is still switching networks. Turn off Connect automatically on your home Wi-Fi so Windows stays on the adapter.
+              </p>
+            ) : (
+              <p className="mt-2 text-sm text-muted">
+                Chrome cannot open the adapter port itself. Download the bridge again, stop the old window with Ctrl+C, and run py xhp-bridge.py. Windows will leave this Wi-Fi because it has no internet. Turn off Connect automatically on your home Wi-Fi, then join the adapter and leave the scanner plugged in.
+              </p>
+            )}
             <div className="mt-3 flex flex-wrap items-end gap-2">
-              <a className="inline-flex h-11 items-center rounded-md border border-line px-3 text-sm" href="/xhp-bridge.py" download="xhp-bridge.py">
-                Download bridge
-              </a>
+              {desktopXhp() ? null : (
+                <a className="inline-flex h-11 items-center rounded-md border border-line px-3 text-sm" href="/xhp-bridge.py" download="xhp-bridge.py">
+                  Download bridge
+                </a>
+              )}
               {link ? null : (
                 <button
                   type="button"
@@ -478,7 +486,7 @@ export function CablePanel({ onCapture }: { onCapture: (name: string, bytes: Uin
             <li>Close INPA before connecting. Two programs cannot hold the same lead.</li>
             <li>The OBD plug stays in the car with ignition on. This lead echoes adapter status and only answers after the transmit line is released.</li>
             <li>Switch the lead to D-CAN, not K-line. Ignition on, engine off.</li>
-            <li>For the xHP adapter, join its Wi-Fi on the phone first, the same as the xHP app. The USB buttons are a separate lead.</li>
+            <li>For the xHP adapter, join its Wi-Fi, leave the scanner plugged in, and press Connect xHP Wi-Fi. The Windows app opens that port itself.</li>
           </ul>
         </div>
       </aside>

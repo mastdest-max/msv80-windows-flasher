@@ -17,6 +17,7 @@
     },
     "files": [
       "electron-main.mjs",
+      "preload.cjs",
       "repository-store.mjs",
       "dist/**/*"
     ],

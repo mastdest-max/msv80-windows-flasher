@@ -11,6 +11,6 @@ npm install
 npm run desktop:dist
 ```
 
-Plug the K+DCAN lead in, choose Cable, and press Connect. Windows asks which cable to use. For the xHP Wi-Fi adapter, run `python public\xhp-bridge.py` first, then Connect xHP Wi-Fi.
+Plug the K+DCAN lead in, choose Cable, and press Connect. Windows asks which cable to use. For the xHP adapter, join its Wi-Fi and press Connect xHP Wi-Fi. The app opens the adapter port itself. You do not run the Python bridge.
 
 Files you add in Repository are stored in your Windows user data folder, not in the website.

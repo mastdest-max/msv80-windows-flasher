@@ -9,7 +9,11 @@ type TcpHandle = { opened: Promise<TcpOpened>; close: () => Promise<void> | void
 
 const BRIDGE = "ws://127.0.0.1:8770";
 const BLOCKED =
-  "Chrome still cannot open the adapter port by itself. Download the bridge, run python3 xhp-bridge.py on this computer, join the adapter Wi-Fi, then press Connect again.";
+  "This window cannot open the adapter port by itself. On the website, run python3 xhp-bridge.py, join the adapter Wi-Fi, then press Connect again.";
+
+export function desktopXhp(): boolean {
+  return typeof window !== "undefined" && Boolean((window as Window & { msvDesktop?: { xhp?: boolean } }).msvDesktop?.xhp);
+}
 
 function tcpConstructors(): Array<(host: string, port: number) => TcpHandle> {
   const ctor = (globalThis as { TCPSocket?: unknown }).TCPSocket;
@@ -87,7 +91,7 @@ function openBridge(): Promise<TcpOpened & { close: () => Promise<void> }> {
     const timer = setTimeout(() => {
       socket.close();
       reject(new Error(BLOCKED));
-    }, 2500);
+    }, desktopXhp() ? 20000 : 2500);
     const fail = () => {
       clearTimeout(timer);
       reject(new Error(BLOCKED));
@@ -95,7 +99,15 @@ function openBridge(): Promise<TcpOpened & { close: () => Promise<void> }> {
     socket.onerror = fail;
     socket.onclose = fail;
     socket.onmessage = (event) => {
-      if (event.data !== "ok") return;
+      if (typeof event.data !== "string") return;
+      if (event.data !== "ok") {
+        clearTimeout(timer);
+        socket.onerror = null;
+        socket.onclose = null;
+        socket.close();
+        reject(new Error(event.data));
+        return;
+      }
       clearTimeout(timer);
       socket.onerror = null;
       socket.onclose = null;
@@ -138,7 +150,7 @@ export function xhpWifiPort(log: (line: string) => void): SerialPortLike {
       return writable;
     },
     async open() {
-      log("Opening the adapter through the local bridge.");
+      log(desktopXhp() ? "Opening the xHP adapter from this Windows app." : "Opening the adapter through the local bridge.");
       try {
         const opened = await openBridge();
         readable = opened.readable;
