@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Activity, CircleCheck } from "lucide-react";
+import { Activity } from "lucide-react";
 import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { CHANNELS, FAST_CHANNEL_IDS, latestOf, logToCsv, sampleLog, type Channel, type LogSession, type Sample } from "@/lib/msv/logger";
 import { describeBlock, localPayload, words } from "@/lib/msv/chassis";
@@ -232,19 +232,37 @@ export function LoggerPanel() {
     value: sample.values[channel.id],
   }));
   const span = log.samples.length ? log.samples[log.samples.length - 1].t / 1000 : 0;
+  const groups = [...new Set(CHANNELS.map((item) => item.group))];
 
   return (
     <div className="flex flex-col gap-4">
-    <div className="grid gap-4 lg:grid-cols-5">
-      <div className="flex flex-col gap-3 lg:col-span-3">
-        <div className="rounded-lg border border-line bg-surface p-4">
-          <div className="flex items-center gap-2">
-            <Activity className="size-4 text-lamp" aria-hidden="true" />
-            <h2 className="font-medium">Data logger</h2>
-          </div>
-          <p className="mt-2 text-sm text-muted">{log.note}</p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <div className="relative">
+      <div className="rounded-lg border border-line bg-surface p-4">
+        <div className="flex items-center gap-2">
+          <Activity className="size-4 text-lamp" aria-hidden="true" />
+          <h2 className="font-medium">Data logger</h2>
+        </div>
+        <p className="mt-2 text-sm text-muted">{log.note}</p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <label className="flex h-11 items-center gap-2 rounded-md border border-line px-3 text-sm">
+            Channel
+            <select
+              className="h-8 max-w-56 bg-surface text-sm"
+              value={channel.id}
+              onChange={(event) => setChannelId(event.target.value)}
+            >
+              {groups.map((group) => (
+                <optgroup key={group} label={group}>
+                  {CHANNELS.filter((item) => item.group === group).map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.name}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+            <span className="font-mono text-muted">{formatValue(channel, latestOf(log, channel.id))}</span>
+          </label>
+          <div className="relative">
               <button
                 type="button"
                 aria-expanded={menu}
@@ -308,6 +326,7 @@ export function LoggerPanel() {
           <p className="mt-3 text-sm text-muted">
             {log.source === "sample" ? "Sample" : "Live"} · {log.samples.length} samples · {span.toFixed(1)} s
             {lead ? ` · ${lead}` : ""}
+            {connected ? " · Lead is open." : " · Nothing is connected. This is the sample."}
           </p>
         </div>
         {watch.length > 0 ? (
@@ -343,39 +362,7 @@ export function LoggerPanel() {
             </ResponsiveContainer>
           </div>
         </div>
-      </div>
-
-      <aside className="flex flex-col gap-2 lg:col-span-2">
-        {CHANNELS.map((item, index) => {
-          const selected = item.id === channel.id;
-          const showGroup = index === 0 || CHANNELS[index - 1].group !== item.group;
-          return (
-            <div key={item.id} className="flex flex-col gap-2">
-              {showGroup ? <p className="px-1 pt-2 text-xs font-medium tracking-wide text-muted">{item.group}</p> : null}
-              <button
-                type="button"
-                className={
-                  selected
-                    ? "flex h-11 items-center justify-between rounded-lg border border-lamp bg-lamp-dim px-3 text-left text-sm"
-                    : "flex h-11 items-center justify-between rounded-lg border border-line bg-surface px-3 text-left text-sm"
-                }
-                onClick={() => setChannelId(item.id)}
-              >
-                <span>{item.name}</span>
-                <span className="font-mono text-muted">{formatValue(item, latestOf(log, item.id))}</span>
-              </button>
-            </div>
-          );
-        })}
-        <p className="mt-1 flex items-start gap-2 text-sm text-muted">
-          <CircleCheck className="mt-0.5 size-4 shrink-0 text-signal" aria-hidden="true" />
-          {connected
-            ? "The lead is open. Start live log when the ignition is on. The sample stays until you do."
-            : "Nothing is connected. This sample is what the logger looks like. Connect on the Cable tab when the car is ready."}
-        </p>
-      </aside>
-    </div>
-    <ChassisPanel />
+      <ChassisPanel />
     </div>
   );
 }
