@@ -161,22 +161,36 @@ export function ReadChoices({
       }
       image.set(hit.data, offset);
       got += length;
-      if (offset % (CHUNK * 8) === 0) setProgress({ done: got, total: size });
+      const done = offset + length >= size;
+      if (done || offset % (CHUNK * 8) === 0) {
+        const partial = !done;
+        const taken = image.subarray(0, got);
+        const name = partial ? filename.replace(/(\.[^.]+)$/, "-partial$1") : filename;
+        const download = name.endsWith(".0da") ? new TextEncoder().encode(toIntelHex(taken, base)) : taken.slice();
+        const kind = partial
+          ? `Read so far: ${got.toLocaleString()} of ${size.toLocaleString()} bytes. Save this file. It is not a full module yet.`
+          : base === 0
+            ? "Full module, about 2.5 MB. This file is the read."
+            : "Calibration only, about 250 KB. This file is the read.";
+        setFile({ name, bytes: download, kind });
+        onCapture(name.endsWith(".0da") ? name.replace(/\.0da$/, ".bin") : name, taken.slice());
+        setProgress({ done: got, total: size });
+      }
     }
     setProgress({ done: got, total: size });
     if (got === 0) return;
     const partial = got < size;
     const taken = image.subarray(0, got);
     const name = partial ? filename.replace(/(\.[^.]+)$/, "-partial$1") : filename;
-    const download = name.endsWith(".0da") ? new TextEncoder().encode(toIntelHex(taken, base)) : taken;
+    const download = name.endsWith(".0da") ? new TextEncoder().encode(toIntelHex(taken, base)) : taken.slice();
     const kind = partial
-      ? `Partial. ${got.toLocaleString()} of ${size.toLocaleString()} bytes. Do not treat this as a full module.`
+      ? `Partial. ${got.toLocaleString()} of ${size.toLocaleString()} bytes. This file is the read. Do not treat it as a full module.`
       : base === 0
-        ? "Full module, about 2.5 MB. Open it on Inspect before you trust it."
-        : "Calibration only, about 250 KB. Not the whole module.";
+        ? "Full module, about 2.5 MB. This file is the read. Open it on Inspect before you trust it."
+        : "Calibration only, about 250 KB. This file is the read. Not the whole module.";
     setFile({ name, bytes: download, kind });
     setNote(kind);
-    onCapture(name.endsWith(".0da") ? name.replace(/\.0da$/, ".bin") : name, taken);
+    onCapture(name.endsWith(".0da") ? name.replace(/\.0da$/, ".bin") : name, taken.slice());
   }
 
   async function run() {
@@ -254,7 +268,7 @@ export function ReadChoices({
     <div className="rounded-lg border border-line bg-surface p-4">
       <h2 className="font-medium">What to read</h2>
       <p className="mt-2 text-sm text-muted">
-        A full module is about 2.5 MB. A calibration is about 250 KB of maps. Anything shorter is a partial read. Writing a file is on the Flash menu, not here.
+        A full module is about 2.5 MB. A calibration is about 250 KB of maps. You do not need a file first. The read creates the file, and Save keeps whatever the DME has already sent.
       </p>
       <div className="mt-3 grid gap-2 sm:grid-cols-2">
         <button
