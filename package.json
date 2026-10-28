@@ -18,7 +18,10 @@
     "check:auth": "node scripts/check-auth-invariant.mjs",
     "test": "node --test 'scripts/**/*.test.mjs' && node --experimental-strip-types --test src/lib/app-data/app-data.test.ts src/lib/app-data/readiness-schedule.test.ts src/lib/auth/gate-identity.test.ts src/lib/auth/sign-in-gate.test.ts src/lib/preview-path-prefix.test.ts",
     "lint": "eslint .",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "desktop:build": "vite build --config desktop/vite.config.ts && node --input-type=module -e \"import { copyFileSync } from 'node:fs'; copyFileSync('scripts/repository-store.mjs','desktop/repository-store.mjs')\"",
+    "desktop": "npm run desktop:build && npm start --prefix desktop",
+    "desktop:dist": "npm run desktop:build && npm install --prefix desktop && npm run dist:win --prefix desktop"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.4",
